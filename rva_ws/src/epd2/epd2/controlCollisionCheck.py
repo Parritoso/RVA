@@ -155,8 +155,8 @@ class TurtlebotControlCollisionCheck(Node):
         # -------------------------------------------------------------
         # TODO: use self.laser to check possible collisions
         # return True if possible collision, False otherwise
-        for i in range(len(self.laser.range)):
-            if range[i] < self.laser.range_min:
+        for i in range(len(self.laser.ranges)):
+            if self.laser.ranges[i] < self.laser.range_min:
                 return True
         return False
         # -------------------------------------------------------------
@@ -167,7 +167,7 @@ class TurtlebotControlCollisionCheck(Node):
         # stop turtlebot
         self.get_logger().info("Stop TurtleBot")
         # a default Twist has linear.x of 0 and angular.z of 0. So it'll stop TurtleBot
-        self.cmd_vel.publish(Twist())
+        self.cmd_vel.publish(TwistStamped())
  
  
 def main():
