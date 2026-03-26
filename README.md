@@ -67,3 +67,8 @@ Comandos útiles para depurar y visualizar el estado del sistema:
     ```bash
     ros2 topic pub /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: 'odom'}, pose: {position: {x: 1.0, y: 1.0, z: 0.0}}}"
     ```
+    
+    cd /home/rva_ws
+rm -rf build/ install/ log/
+colcon build
+source install/setup.bash

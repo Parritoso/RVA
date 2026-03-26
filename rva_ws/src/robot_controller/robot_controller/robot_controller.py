@@ -4,8 +4,9 @@
 import sys
 import math
 import rclpy
+import tf2_geometry_msgs
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, PointStamped, PoseStamped
+from geometry_msgs.msg import Twist, PointStamped, PoseStamped, Pose, TwistStamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Path, Odometry
 from tf2_ros import TransformException
@@ -42,7 +43,7 @@ class TurtlebotController(Node):
         self.laser_received = False
         
         # Declare the velocity command publisher
-        self.cmd_vel = self.create_publisher(Twist, robot_vel_topic, 10)
+        self.cmd_vel = self.create_publisher(TwistStamped, robot_vel_topic, 10)
         
         # Create tf2 buffer and listener
         self.tf_buffer = Buffer()
@@ -80,51 +81,52 @@ class TurtlebotController(Node):
         Command the robot to follow the path
         Returns True if goal reached, False otherwise
         """
-        # Check if the final goal has been reached
-        # TODO: Exercise 1:implement goal reached check
-        if self.goal_reached():
-            self.get_logger().info("GOAL REACHED!!! Stopping!")
-            self.publish(0.0, 0.0)
-            return True
-        
-        # Determine the local path point to be reached
-        # TODO: Exercise 1: fill the method get_sub_goal
-        current_goal = self.get_sub_goal()
+        if self.path_received:
+            # Check if the final goal has been reached
+            # TODO: Exercise 1:implement goal reached check
+            if self.goal_reached():
+                self.get_logger().info("GOAL REACHED!!! Stopping!")
+                self.publish(0.0, 0.0)
+                return True
+            
+            # Determine the local path point to be reached
+            # TODO: Exercise 1: fill the method get_sub_goal
+            current_goal = self.get_sub_goal()
+            current_goal = current_goal.pose.position
+            self.get_logger().info('current_goal: %.03f' % current_goal.x)
+            self.get_logger().info('current_goal: %.03f' % current_goal.y)
 
-        theta = math.atan2(current_goal.point.y, current_goal.point.x)
-        linear = 0.0
-        angular = 0.0
-        self.get_logger().info('Theta: %.2f' % (theta))
-        if abs(current_goal.point.x) > 0.01 or abs(current_goal.point.y) > 0.01:
-            if abs(theta) > 0.01:
-                angular = self.max_ang_vel * theta
-            else :
-                angular = 0.0
-                linear = self.max_lin_vel * math.sqrt(current_goal.point.x ** 2 + current_goal.point.y ** 2)  
-        else:
-            self.shutdown() 
+            theta = math.atan2(current_goal.y, current_goal.x)
+            linear = 0.0
+            angular = 0.0
+            self.get_logger().info('Theta: %.4f' % (theta))
+            if abs(current_goal.x) > 0.01 or abs(current_goal.y) > 0.01:
+                if abs(theta) > 0.01:
+                    angular = self.max_ang_vel * theta
+                else :
+                    angular = 0.0
+                    linear = self.max_lin_vel * math.sqrt(current_goal.x ** 2 + current_goal.y ** 2)  
+                
+            # TODO: use current_goal 
+            # Put your control law here (copy from EPD1)
             
-        # TODO: use current_goal 
-        # Put your control law here (copy from EPD1)
-        angular = 0.0
-        linear = 0.0
-        
-        # Check the maximum speed values allowed
-        angular = self.constrain_vel(angular, -self.max_ang_vel, self.max_ang_vel)
-        linear = self.constrain_vel(linear, 0.0, self.max_lin_vel)
-            
-        # If the computed commands does not provoke a collision,
-        # send the commands to the robot
-        # TODO: fill the check_collision function (copy from EPD2)
-        if not self.check_collision(linear, angular):
+            # Check the maximum speed values allowed
+            angular = self.constrain_vel(angular, -self.max_ang_vel, self.max_ang_vel)
+            linear = self.constrain_vel(linear, 0.0, self.max_lin_vel)
+                
+            # If the computed commands does not provoke a collision,
+            # send the commands to the robot
+            # TODO: fill the check_collision function (copy from EPD2)
+            if not self.check_collision(linear, angular):
+                self.get_logger().info('Colision')
+                self.publish(linear, angular)
+                return False
+
+            # If a possible collision is detected,
+            # try to find an alternative command to avoid the collision
+            # TODO: Exercise 2: fill the collision_avoidance function
+            linear, angular = self.collision_avoidance() 
             self.publish(linear, angular)
-            return False
-
-        # If a possible collision is detected,
-        # try to find an alternative command to avoid the collision
-        # TODO: Exercise 2: fill the collision_avoidance function
-        linear, angular = self.collision_avoidance() 
-        self.publish(linear, angular)
         return False
 
 
@@ -135,10 +137,11 @@ class TurtlebotController(Node):
         has reached the final goal (the robot is in a close position).
         Returns True if the FINAL goal was reached, False otherwise
         """
-        pos_final = self.path.poses[len(self.path.poses)-1]
+        pos_final = self.path.poses[-1]
 
+        #self.get_logger().info('goal_reached: %s' % type(pos_final))
         try:
-            base_goal = self.tf_buffer.transform(pos_final, 'base_footprint', timeout=rclpy.duration.Duration(seconds=1.0))
+            base_goal = self.utils.transform_pose(pos_final,'base_footprint',self.get_logger()) #self.tf_buffer.transform(pos_final, 'base_footprint', timeout=rclpy.duration.Duration(seconds=1.0))
         except TransformException as e:
             self.get_logger().warn(f"Transform failed: {e}")
             return
@@ -161,22 +164,58 @@ class TurtlebotController(Node):
         path_pose_in_robot_frame = self.utils.transform_pose(
             path_pose, 'base_footprint', self.get_logger())
         """
-        next
-        j
+        #self.get_logger().info('%d' % len(self.path.poses))
+        """next_point = self.utils.transform_pose(self.path.poses[0], 'base_footprint', self.get_logger())
+        j = sys.maxsize
         for i in range(len(self.path.poses)):
 
             path_pose = self.path.poses[i]
             path_pose_in_robot_frame = self.utils.transform_pose(path_pose, 'base_footprint', self.get_logger())
             coords = path_pose_in_robot_frame.pose.position
-            if coords.x > 0 and coords.y > 0:
+            if coords.x > 0:
                 if coords.x >= ERROR_ADMITIDO and coords.y >= ERROR_ADMITIDO:
-                    if coords.x < next.x and coords.y < next.y:
-                        next = path_pose_in_robot_frame
+                    if coords.x < next_point.pose.position.x and coords.y < next_point.pose.position.y:
+                        next_point = path_pose_in_robot_frame
                         j = i
-        
-        subgoal = self.path.poses[j]
 
-        return subgoal
+        subgoal = self.path.poses[0]
+        if j != sys.maxsize:
+            subgoal = self.path.poses[j]
+
+        self.get_logger().info('%d' % self.path.poses.index(subgoal))
+        self.get_logger().info('%.2f' % subgoal.pose.position.x)
+        self.get_logger().info('%.2f' % subgoal.pose.position.y)
+        return subgoal"""
+        if not self.path_received or len(self.path.poses) == 0:
+            return None
+
+        best_pose = None
+        min_dist = float('inf')
+
+        for path_pose in self.path.poses:
+            try:
+                # Transformamos cada punto al marco del robot
+                transformed_pose = self.utils.transform_pose(path_pose, 'base_footprint', self.get_logger())
+                if transformed_pose is not None:
+                    coords = transformed_pose.pose.position
+                    
+                    # Solo nos interesan puntos delante del robot (x > 0)
+                    if coords.x > 0.0:
+                        # Calculamos la distancia real al punto
+                        dist = math.sqrt(coords.x**2 + coords.y**2)
+                        
+                        # Nos quedamos con el punto más cercano que supere el error admitido
+                        if dist > ERROR_ADMITIDO and dist < min_dist:
+                            min_dist = dist
+                            best_pose = transformed_pose
+            except Exception:
+                continue
+
+        # Si no encontró ningún punto válido delante, va al final de la ruta
+        if best_pose is None:
+            best_pose = self.utils.transform_pose(self.path.poses[-1], 'base_footprint', self.get_logger())
+            
+        return best_pose
 
 
     def check_collision(self, linear, angular):
@@ -187,10 +226,25 @@ class TurtlebotController(Node):
         Returns True if possible collision, False otherwise
         """
 
+        """"
         for i in range(len(self.laser.ranges)):
-            if self.laser.ranges[i] < self.laser.range_min:
+            if self.laser.ranges[i] > 0.012:
                 return True
-        return False
+        return False"""
+        valid_ranges = [r for r in self.laser.ranges if r > self.laser.range_min and r < self.laser.range_max]
+        
+        # 2. Si no hay datos válidos, asumimos que no hay peligro inminente
+        if not valid_ranges:
+            return False
+            
+        # 3. Comprobamos la lectura más cercana
+        distancia_minima = min(valid_ranges)
+        distancia_seguridad = 0.4 # Metros (40 cm)
+        
+        if distancia_minima > distancia_seguridad:
+            return True # ¡Peligro, hay un obstáculo cerca!
+            
+        return False # Camino libre
 
 
     def collision_avoidance(self):
@@ -203,17 +257,46 @@ class TurtlebotController(Node):
         Feel free to add the new variables and methods that you may need
         Returns (lin_vel, ang_vel)
         """
-        theta = math.atan2(y, x)
-        self.get_logger().info('Theta: %.2f' % (theta))
-        if abs(x) > 0.01 or abs(y) > 0.01:
-            if abs(theta) > 0.01:
-                angular = self.max_ang_vel * theta
-            else :
-                angular = 0.0
-                linear =  self.max_lin_vel * math.sqrt(x ** 2 + y ** 2) 
 
-        ang_vel = 0.0
-        lin_vel = 0.0
+        m_atrac = 0.6
+        rsoi = 1
+        do = min(self.laser.ranges)
+
+        indice_min = self.laser.ranges.index(do)
+
+        theta = self.laser.angle_min + (indice_min * self.laser.angle_increment)
+
+        goal = self.get_sub_goal()
+        punto = [goal.pose.position.x, goal.pose.position.y]
+        resultado_atraccion = [x / math.sqrt(goal.pose.position.x**2 + goal.pose.position.y**2) for x in punto]
+        resultado_atraccion = [m_atrac * x for x in resultado_atraccion]
+        F_atr_x = resultado_atraccion[0]
+        F_atr_y = resultado_atraccion[1]
+
+        self.get_logger().info('F_atr_x: %.3f' % F_atr_x)
+        self.get_logger().info('F_atr_y: %.3f' % F_atr_y)
+
+        if 0.0 < do <= rsoi:
+            magnitud_fuerza = (rsoi - do) / do
+            F_rep_x = -magnitud_fuerza * math.cos(theta)
+            F_rep_y = -magnitud_fuerza * math.sin(theta)
+        else:
+            F_rep_x = 0.0
+            F_rep_y = 0.0
+
+        self.get_logger().info('F_rep_x: %.3f' % F_rep_x)
+        self.get_logger().info('F_rep_y: %.3f' % F_rep_y)
+        F_x = F_atr_x + F_rep_x
+        F_y = F_atr_y + F_rep_y
+        self.get_logger().info('F_x: %.3f' % F_x)
+        self.get_logger().info('F_y: %.3f' % F_y)
+            
+        ang_vel = math.atan2(F_y, F_x)
+        ang_vel = self.constrain_vel(ang_vel, -self.max_ang_vel, self.max_ang_vel)
+        lin_vel = self.max_lin_vel * math.sqrt(F_x**2 + F_y**2)
+        lin_vel = self.constrain_vel(lin_vel, 0.0, self.max_lin_vel)
+        self.get_logger().info('ang_vel : %.3f' % ang_vel)
+        self.get_logger().info('lin_vel: %.3f' % lin_vel)
         return lin_vel, ang_vel
 
 
@@ -230,9 +313,9 @@ class TurtlebotController(Node):
         
     def publish(self, lin_vel, ang_vel):
         """Publish velocity commands to the robot"""
-        move_cmd = Twist()
-        move_cmd.linear.x = lin_vel
-        move_cmd.angular.z = ang_vel
+        move_cmd = TwistStamped()
+        move_cmd.twist.linear.x = lin_vel
+        move_cmd.twist.angular.z = ang_vel
         self.cmd_vel.publish(move_cmd)
 
 
