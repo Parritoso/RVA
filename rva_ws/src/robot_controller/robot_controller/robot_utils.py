@@ -82,10 +82,10 @@ class Utils():
         pose: PoseStamped to be transformed
         to_frame: desired frame
         logger: optional logger for error messages
-        Returns: the transformed PoseStamped
+        Returns: the transformed PoseStamped, or None if TF is not available
         """
         pose.header.stamp = type(pose.header.stamp)(sec=0, nanosec=0)
-        pose_trans = PoseStamped()
+        pose_trans = None
         try:
             pose_trans = self.tf_buffer.transform(pose, to_frame)
         except tf2_ros.LookupException as e:
@@ -107,10 +107,10 @@ class Utils():
         point: PointStamped to be transformed
         to_frame: desired frame
         logger: optional logger for error messages
-        Returns: the transformed PointStamped
+        Returns: the transformed PointStamped, or None if TF is not available
         """
         point.header.stamp = type(point.header.stamp)(sec=0, nanosec=0)
-        point_trans = PointStamped()
+        point_trans = None
         try:
             point_trans = self.tf_buffer.transform(point, to_frame)
         except tf2_ros.LookupException as e:

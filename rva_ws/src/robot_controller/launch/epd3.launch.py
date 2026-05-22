@@ -75,6 +75,7 @@ def generate_launch_description():
             {'max_lin_vel': 0.3},
             {'max_ang_vel': 1.2},
             {'control_rate': 10},
+            {'use_sim_time': True},
         ]
     )
 

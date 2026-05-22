@@ -1,0 +1,9 @@
+source;share/robotics_challenge/hook/pythonpath.ps1
+source;share/robotics_challenge/hook/pythonpath.dsv
+source;share/robotics_challenge/hook/pythonpath.sh
+source;share/robotics_challenge/hook/ament_prefix_path.ps1
+source;share/robotics_challenge/hook/ament_prefix_path.dsv
+source;share/robotics_challenge/hook/ament_prefix_path.sh
+source;../../build/robotics_challenge/share/robotics_challenge/hook/pythonpath_develop.ps1
+source;../../build/robotics_challenge/share/robotics_challenge/hook/pythonpath_develop.dsv
+source;../../build/robotics_challenge/share/robotics_challenge/hook/pythonpath_develop.sh
