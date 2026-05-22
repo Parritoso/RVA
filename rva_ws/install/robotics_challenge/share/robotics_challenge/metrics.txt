@@ -1,8 +1,8 @@
 Goals reached: 4
-Elapsed time: 102.501172
-Traveled Distance: 16.507193
-Min distance to obstacles: 0.161470
-Avg distance to obstacles: 0.490000
+Elapsed time: 96.701346
+Traveled Distance: 16.514912
+Min distance to obstacles: 0.121609
+Avg distance to obstacles: 0.480000
 Collision penalties: 0
 Linear vel penalties: 0
 Angular vel penalties: 0

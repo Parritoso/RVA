@@ -28,7 +28,6 @@ class Planner:
         print("Resolution: %.3f m/cell" % self.resolution)
         print("Width: %i cells, height: %i cells" % (self.x_width, self.y_width))
         
-        # MODIFICACIÓN 1: Almacenar los costes reales en lugar de un mapa binario
         self.cost_map = [[0 for _ in range(self.y_width)] for _ in range(self.x_width)]
         x = 0
         y = 0
@@ -160,7 +159,6 @@ class Planner:
                     # MODIFICACIÓN 2: Penalización de coste por zona de inflación
                     # El valor en cost_map será de 0 a 252.
                     # Lo dividimos por un factor (ej. 20.0) para balancearlo frente a la distancia de avance.
-                    # Ajusta este valor: menor divisor = el robot huirá más de las paredes.
                     inflation_penalty = self.cost_map[nx][ny] / 20.0
                     
                     neighbor.cost = current.cost + move_dist_cost + inflation_penalty
@@ -172,10 +170,8 @@ class Planner:
                         if open_set[neighbor_key].cost <= neighbor.cost:
                             continue
 
-                    # Añadir/actualizar en open_set
                     open_set[neighbor_key] = neighbor
 
-            # Si salimos del while, no hay camino
             print("No path found")
             return None
         except Exception as e:
@@ -239,7 +235,6 @@ class Planner:
         if ry >= self.max_y:
             return False
         
-        # MODIFICACIÓN 3: Comprobar la colisión contra LETHAL_COST en lugar de booleano
         if self.cost_map[int(node.x_cell)][int(node.y_cell)] >= LETHAL_COST:
             return False
 
